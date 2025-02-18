@@ -32,6 +32,7 @@ configure_git_ssl_verification "$payload"
 configure_credentials "$payload"
 
 uri=$(jq -r '.source.uri // ""' <<< "$payload")
+version_file=$(jq -r '.source.version_file // ""' <<< "$payload")
 branch=$(jq -r '.source.branch // ""' <<< "$payload")
 git_config_payload=$(jq -r '.source.git_config // []' <<< "$payload")
 ref=$(jq -r '.version.ref // "HEAD"' <<< "$payload")
@@ -254,6 +255,14 @@ git log -1 --format=%cd --date=${timestamp_format} > .git/commit_timestamp
 # a custom tag, or package to publish
 echo "$(git describe ${describe_ref_options})" > .git/describe_ref
 
+# Get version from repo version file
+if [ -n "$version_file" ]; then
+  return_version=$(git show ${return_ref}:${version_file} 2>/dev/null)
+  echo $return_version > $1/version
+else
+  return_version=""
+fi
+
 metadata=$(git_metadata)
 
 if [ "$clean_tags" == "true" ]; then
@@ -261,6 +270,6 @@ if [ "$clean_tags" == "true" ]; then
 fi
 
 jq -n "{
-  version: {ref: $(echo $return_ref | jq -R .)},
+  version: {ref: $(echo $return_ref | jq -R .), version: $(echo $return_version | jq -R .)},
   metadata: $metadata
 }" >&3
