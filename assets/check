@@ -123,7 +123,12 @@ else
   paths_search=`echo "-- $paths $ignore_paths" | tr "\n\r" " "`
 fi
 
-list_command="git rev-list --all --first-parent $log_range $paths_search"
+if [ -n "$version_file" ]; then
+  list_command="git log --pretty=%H -$version_depth -- $version_file"
+else
+  list_command="git rev-list --all --first-parent $log_range $paths_search"
+fi
+
 if jq -e 'length > 0' <<<"$filter_include"
 then
     list_command+=" | git rev-list --stdin --date-order  --first-parent --no-walk=unsorted "
@@ -179,6 +184,19 @@ get_commit(){
   done
 }
 
+get_commit_by_ref(){
+  for ref in $*; do
+
+    if [ -n "$version_file" ]; then
+      file_content=$(git show $ref:$version_file 2>/dev/null)
+      jq -n '{ref: $ref, version: $version}' --arg ref $ref --arg version $file_content
+    else
+      jq -n '{ref: $ref}' --arg ref $ref
+    fi
+
+  done
+}
+
 #if no range is selected just grab the last commit that fits the filter
 if [ -z "$log_range" ]
 then
@@ -228,7 +246,7 @@ else
   {
     set -f
     commits=$(eval "$list_command")
-    get_commit $commits | jq -s '.'
+    get_commit_by_ref $commits | jq -s '.'
     set +f
   } >&3
 fi
